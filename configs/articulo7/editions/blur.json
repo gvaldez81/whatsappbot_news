@@ -8,14 +8,17 @@
     "category_size": 40,
     "title_color": [255, 255, 255],
     "category_color": [255, 200, 0],
-    "margin_x": 80,
-    "margin_y": 80,
+    "margin_x": 50,
+    "margin_y": 700,
     "line_spacing": 12,
     "max_width_ratio": 0.9,
     "gap_title_category": 20
   },
   "assets": {
     "fonts_dir": "assets/fonts"
+  },
+  "filters": {
+    "vignette": { "intensity": 0.6 }
   },
   "output": {
     "format": "JPEG",

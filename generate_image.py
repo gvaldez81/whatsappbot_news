@@ -1,29 +1,3 @@
-# generate_image.py
-# Motor gráfico con:
-# - Ediciones automáticas para links (recorte, blur, etc.) en configs/articulo7/editions/*.json
-# - Ediciones por petición (logo, watermark, bigtext, recorte, blur) vía caption
-# - Nombres de archivo AUTO-generados con sufijo único (timestamp + UUID corto)
-# - CLI para probar links (multivariantes) e imágenes con caption
-#
-# Requisitos esperados del proyecto:
-# - processors/articulo7.py -> apply(url, config) -> dict(title, image_url, category, error?)
-# - processors/captions.py  -> classify(caption) -> (kind, extra)
-# - processors/logo.py      -> apply(image, cfg) -> image
-# - processors/watermark.py -> apply(image, cfg) -> image
-# - processors/big_text.py  -> apply(image, text, cfg) -> image
-#
-# Configuración:
-# - configs/defaults.json  (estilos editoriales y parámetros gráficos por defecto)
-# - configs/settings.json  (parámetros operativos; se fusiona sobre defaults)
-# - configs/articulo7/editions/*.json (cada una es una edición editorial)
-#
-# Nota: NO es necesario definir "filename" en los JSON. Se genera automáticamente:
-#   - Para ediciones: <variant>-<timestamp>-<uuid6>.jpg
-#   - Para captions:  <kind>-<timestamp>-<uuid6>.jpg
-# Donde <variant> es el nombre del archivo JSON de la edición (sin .json).
-#
-# El caption para big text es "big" (sin signos).
-
 import io
 import os
 import json
@@ -36,13 +10,13 @@ from typing import Tuple, Optional, Dict, Any, List
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
-from processors import captions, logo, watermark, big_text, articulo7
+from processors import articulo7, captions, logo, watermark, big_text
+from processors import text_render, filters, crop
 
 logger = logging.getLogger("generate_image")
 
-
 # ------------------------------------------------------------------------------
-# Helpers genéricos
+# Helpers
 # ------------------------------------------------------------------------------
 
 def _unique_suffix() -> str:
@@ -56,28 +30,6 @@ def _safe_truetype(path: str, size: int) -> ImageFont.FreeTypeFont:
     except Exception as e:
         logger.warning("No se pudo cargar fuente %s (%s). Usando default.", path, e)
         return ImageFont.load_default()
-
-def _text_size(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> Tuple[int, int]:
-    if hasattr(draw, "textbbox"):
-        bbox = draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    return draw.textsize(text, font=font)
-
-def _wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> str:
-    words = text.split()
-    if not words:
-        return ""
-    lines, current = [], words[0]
-    for w in words[1:]:
-        test = f"{current} {w}"
-        w_px, _ = _text_size(draw, test, font)
-        if w_px <= max_width:
-            current = test
-        else:
-            lines.append(current)
-            current = w
-    lines.append(current)
-    return "\n".join(lines)
 
 def _save_to_bytes(img: Image.Image, format_hint: str = "JPEG") -> bytes:
     fmt = (format_hint or "JPEG").upper()
@@ -101,49 +53,8 @@ def _load_image_from_url(url: str) -> Image.Image:
         img = img.convert("RGB")
     return img
 
-
 # ------------------------------------------------------------------------------
-# Renderizado de título/categoría
-# ------------------------------------------------------------------------------
-
-def _compose_title_and_category(base: Image.Image, title: str, category: str,
-                                cfg_assets: Dict[str, Any], cfg_text: Dict[str, Any]) -> Image.Image:
-    img = base.copy()
-    draw = ImageDraw.Draw(img)
-
-    fonts_dir = cfg_assets.get("fonts_dir", "assets/fonts")
-    title_font = _safe_truetype(cfg_text.get("title_font", f"{fonts_dir}/Montserrat-Light.ttf"),
-                                int(cfg_text.get("title_size", 56)))
-    category_font = _safe_truetype(cfg_text.get("category_font", f"{fonts_dir}/Montserrat-Light.ttf"),
-                                   int(cfg_text.get("category_size", 36)))
-
-    title_color = tuple(cfg_text.get("title_color", [255, 255, 255]))
-    category_color = tuple(cfg_text.get("category_color", [255, 200, 0]))
-
-    margin_x = int(cfg_text.get("margin_x", 50))
-    margin_y = int(cfg_text.get("margin_y", 50))
-    line_spacing = int(cfg_text.get("line_spacing", 8))
-    max_width_ratio = float(cfg_text.get("max_width_ratio", 0.8))
-    gap = int(cfg_text.get("gap_title_category", 10))
-
-    max_text_width = int(img.width * max_width_ratio)
-    wrapped = _wrap_text(title.strip(), title_font, max_text_width, draw)
-
-    y = margin_y
-    for line in wrapped.split("\n"):
-        draw.text((margin_x, y), line, font=title_font, fill=title_color)
-        _, h = _text_size(draw, line, title_font)
-        y += h + line_spacing
-
-    y += gap
-    if category:
-        draw.text((margin_x, y), category.strip(), font=category_font, fill=category_color)
-
-    return img
-
-
-# ------------------------------------------------------------------------------
-# Carga de configuración (defaults + settings + overrides de edición)
+# Configuración
 # ------------------------------------------------------------------------------
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -193,25 +104,96 @@ def _load_variant_confs_from_dir(base_settings: Dict[str, Any], variants_dir: st
             logger.warning("No se pudo cargar override %s: %s", path, e)
     return results
 
+# ------------------------------------------------------------------------------
+# Aplicación de ediciones
+# ------------------------------------------------------------------------------
+def create_blurred_background(fg_img, size, blur_radius=25):
+    target_w, target_h = size
+    bg = fg_img.copy().resize(size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(blur_radius))
 
-# ------------------------------------------------------------------------------
-# Variantes de edición (recorte, blur, etc.)
-# ------------------------------------------------------------------------------
+    w, h = fg_img.size
+    scale = min(target_w / w, target_h / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+    fg_resized = fg_img.resize((new_w, new_h), Image.LANCZOS)
+
+    x = (target_w - new_w) // 2
+    y = (target_h - new_h) // 2
+    bg.paste(fg_resized, (x, y))
+    return bg
+
 
 def _apply_edition(base_img: Image.Image, title: str, category: str, edition_cfg: Dict[str, Any]) -> Image.Image:
     mode = (edition_cfg.get("mode") or "recorte").lower()
     text_cfg = edition_cfg.get("text", {})
     assets_cfg = edition_cfg.get("assets", {})
 
+    # --- Salida target ---
+    target_w = int(edition_cfg.get("output", {}).get("width", 1080))
+    target_h = int(edition_cfg.get("output", {}).get("height", 1350))
+    target_ratio = target_w / target_h
+
+    # --- Fondo base por mode ---
     if mode == "blur":
         radius = int(edition_cfg.get("blur", {}).get("radius", 25))
-        canvas = base_img.filter(ImageFilter.GaussianBlur(radius=radius))
-        out = _compose_title_and_category(canvas, title, category, assets_cfg, text_cfg)
+        canvas = create_blurred_background(base_img, (target_w, target_h), blur_radius=radius)
+        # Fondo blur reescalado para tamaño final
+        #canvas = base_img.resize((target_w, target_h), Image.LANCZOS).filter(ImageFilter.GaussianBlur(radius=radius))
+    elif mode == "recorte":
+        cropped = crop.crop_center_aspect(base_img, target_ratio)
+        canvas = cropped.resize((target_w, target_h), Image.LANCZOS)
     else:
-        out = _compose_title_and_category(base_img, title, category, assets_cfg, text_cfg)
+        # Fallback: adaptar imagen manteniendo relación con letterbox simple
+        canvas = base_img.copy().resize((target_w, target_h), Image.LANCZOS)
 
-    return out
+    # --- Filtros opcionales ---
+    filters_cfg = edition_cfg.get("filters", {})
+    if filters_cfg.get("vignette"):
+        intensity = float(filters_cfg["vignette"].get("intensity", 0.5))
+        canvas = filters.apply_vignette(canvas, intensity)
 
+    if filters_cfg.get("bottom_shadow"):
+        fcfg = filters_cfg["bottom_shadow"]
+        intensity = float(fcfg.get("intensity", 0.5))
+        ratio = float(fcfg.get("height_ratio", 0.4))
+        canvas = filters.apply_bottom_shadow(canvas, intensity, ratio)
+
+    # --- Texto: título + categoría con render avanzado ---
+    # Título
+    # Título
+    lines = text_render.get_title_lines(
+        title,
+        text_cfg["title_font"],
+        int(text_cfg["title_size"]),
+        int(text_cfg.get("tracking", -25)),
+        int(canvas.width * float(text_cfg.get("max_width_ratio", 0.85))),
+        int(text_cfg.get("max_lines", 3))
+    )
+    text_render.draw_title_lines(
+        canvas, lines,
+        int(text_cfg.get("title_x", 50)),
+        int(text_cfg.get("title_y", 700)),
+        text_cfg["title_font"],
+        int(text_cfg["title_size"]),
+        int(text_cfg.get("tracking", -25)),
+        int(text_cfg.get("line_spacing", 96)),
+        (2, 2),
+        float(text_cfg.get("shadow_opacity", 0.5))
+    )
+
+    # Categoría
+    text_render.draw_category_text(
+        canvas, category,
+        text_cfg["category_font"],
+        int(text_cfg["category_size"]),
+        int(text_cfg.get("category_padding", 30)),
+        text_cfg.get("category_border_color", "#FF6000"),
+        (2, 2),
+        int(text_cfg.get("border_thickness", 4)),
+        int(text_cfg.get("category_x", 50)),
+        int(text_cfg.get("category_y", 650))
+    )
+
+    return canvas
 
 # ------------------------------------------------------------------------------
 # API pública
@@ -254,9 +236,6 @@ def generate_all_from_link(url: str, base_settings: Dict[str, Any],
     return results
 
 def generate_from_link(url: str, base_settings: Dict[str, Any]) -> Tuple[bytes, str]:
-    """
-    Compatibilidad: devuelve solo la PRIMERA edición generada.
-    """
     all_res = generate_all_from_link(url, base_settings, editions_dir="configs/articulo7/editions")
     if not all_res:
         raise RuntimeError("No se generó ninguna edición.")
@@ -265,13 +244,12 @@ def generate_from_link(url: str, base_settings: Dict[str, Any]) -> Tuple[bytes, 
 
 def generate_from_media(image_bytes: bytes, caption: Optional[str], base_settings: Dict[str, Any]) -> Tuple[bytes, str]:
     """
-    Procesa una imagen enviada con caption.
     Captions soportados:
-      - "logo"       -> overlay de logo (desde base_settings['logo'])
-      - "watermark"  -> marca de agua (desde base_settings['watermark'])
-      - "big"        -> bigtext (desde base_settings['bigtext'])
-      - "recorte"    -> usa la primera edición con mode=recorte
-      - "blur"       -> usa la primera edición con mode=blur
+      - "logo"       -> overlay de logo
+      - "watermark"  -> marca de agua
+      - "big"        -> bigtext (el resto del caption es el texto)
+      - "recorte"    -> usa primera edición con mode=recorte
+      - "blur"       -> usa primera edición con mode=blur
       - Texto libre  -> si classify lo identifica como 'text'
     """
     logger.info("Procesando media con caption: %s", caption)
@@ -281,12 +259,10 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
     if base.mode not in ("RGB", "RGBA"):
         base = base.convert("RGB")
 
-    # Normaliza 'big' sin signos
     raw_caption = (caption or "").strip()
     kind, extra = captions.classify(raw_caption)
     if raw_caption.lower().startswith("big"):
         kind = "bigtext"
-        # el resto del caption (si existe) después de 'big ' se usa como texto
         parts = raw_caption.split(maxsplit=1)
         extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
 
@@ -317,8 +293,8 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
         if not chosen:
             raise RuntimeError(f"No existe una edición con mode='{kind}' en {editions_dir}")
 
-        # Para media no hay metadatos; usa el caption completo como título si hay texto, o un placeholder
-        title = extra.get("text") or raw_caption or "Sin título"
+        # Para media usamos el caption como título si hay texto, o placeholder
+        title = (extra.get("text") or raw_caption or "Sin título").strip()
         category = "EDICIÓN"
         img = _apply_edition(base, title, category, chosen)
         fname = f"{kind}-{_unique_suffix()}.jpg"
@@ -339,8 +315,31 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
         font = _safe_truetype(font_path, size)
         draw = ImageDraw.Draw(base)
         max_w = int(base.width * max_width_ratio)
-        wrapped = _wrap_text(text, font, max_w, draw)
 
+        # Wrap básico (puedes cambiar a text_render si quieres tracking/sombra)
+        def _text_size(draw, text, font):
+            if hasattr(draw, "textbbox"):
+                bbox = draw.textbbox((0, 0), text, font=font)
+                return bbox[2] - bbox[0], bbox[3] - bbox[1]
+            return draw.textsize(text, font=font)
+
+        def _wrap_text(text, font, max_width, draw):
+            words = text.split()
+            if not words:
+                return ""
+            lines, current = [], words[0]
+            for w in words[1:]:
+                test = f"{current} {w}"
+                w_px, _ = _text_size(draw, test, font)
+                if w_px <= max_w:
+                    current = test
+                else:
+                    lines.append(current)
+                    current = w
+            lines.append(current)
+            return "\n".join(lines)
+
+        wrapped = _wrap_text(text, font, max_w, draw)
         y = margin_y
         for line in wrapped.split("\n"):
             draw.text((margin_x, y), line, font=font, fill=color)
@@ -350,10 +349,9 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
         fname = f"text-{_unique_suffix()}.jpg"
         return _save_to_bytes(base, base_settings.get("output", {}).get("format", "JPEG")), fname
 
-    # Fallback: devolver original
+    # Fallback
     fname = f"original-{_unique_suffix()}.jpg"
     return image_bytes, fname
-
 
 # ------------------------------------------------------------------------------
 # CLI

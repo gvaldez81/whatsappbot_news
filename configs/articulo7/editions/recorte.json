@@ -1,12 +1,12 @@
 {
   "mode": "recorte",
   "text": {
-    "title_size": 56,
-    "category_size": 36,
+    "title_size": 72,
+    "category_size": 40,
     "title_color": [255, 255, 255],
     "category_color": [255, 200, 0],
     "margin_x": 50,
-    "margin_y": 50,
+    "margin_y": 700,
     "line_spacing": 8,
     "max_width_ratio": 0.8,
     "gap_title_category": 10
@@ -14,8 +14,13 @@
   "assets": {
     "fonts_dir": "assets/fonts"
   },
+  "filters": {
+    "vignette": { "intensity": 0.6 }
+  },
   "output": {
     "format": "JPEG",
-    "filename_link": "recorte.jpg"
+    "filename_link": "recorte.jpg",
+    "width": 1080, 
+    "height": 1350 
   }
 }
