@@ -1,6 +1,13 @@
 from PIL import Image, ImageDraw, ImageFont
 
 def get_title_lines(title_text, font_path, font_size, tracking, max_width, max_lines):
+    # print ("texto = "+title_text)
+    # print ("font_path = "+font_path)
+    # print ("font_size = "+str(font_size))
+    # print ("tracking = "+str(tracking))
+    # print ("max_width = "+str(max_width))
+    # print ("max_lines = "+str(max_lines))
+
     font = ImageFont.truetype(font_path, font_size)
     words = title_text.upper().split()
 

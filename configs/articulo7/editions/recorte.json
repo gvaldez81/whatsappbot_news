@@ -2,6 +2,8 @@
   "mode": "recorte",
   "default_category": "ARTÍCULO 7",
   "text": {
+
+    "tracking": 0,
     "title_size": 72,
     "title_font": "assets/fonts/Impact.ttf",
     "title_color": [255, 255, 255],
@@ -21,7 +23,7 @@
     "margin_x": 50,
     "margin_y": 50,
     
-    "line_spacing": 8,
+    "line_spacing": 20,
     "gap_title_category": 10
   },
   "assets": {

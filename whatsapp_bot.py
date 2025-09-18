@@ -138,7 +138,7 @@ def wa_download_media(media_url: str) -> Optional[bytes]:
 # Parsing del webhook
 # ------------------------------------------------------------------------------
 
-URL_RE = re.compile(r"https?://[^"]+")
+URL_RE = re.compile(r"https?://[^\s]+")
 
 def extract_message_entry(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
@@ -197,7 +197,10 @@ def handle_text_link(to: str, url: str) -> None:
         if not all_images:
             wa_send_text(to, "No se generaron imágenes para el enlace.")
             return
-        for image_bytes, filename in all_images:
+
+        for image_info in all_images:
+            image_bytes = image_info["bytes"]
+            filename = image_info.get("filename", "image.jpg")
             media_id = wa_upload_media(image_bytes, filename=filename)
             if not media_id:
                 wa_send_text(to, f"No pude subir la imagen {filename}. Inténtalo de nuevo más tarde.")

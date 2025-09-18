@@ -231,6 +231,7 @@ def generate_all_from_link(url: str, base_settings: Dict[str, Any],
             out_bytes = _save_to_bytes(img, fmt)
             fname = f"{variant_name}-{_unique_suffix()}.jpg"
             results.append({"variant": variant_name, "bytes": out_bytes, "filename": fname})
+            #print(variant_name+" - " + fname)
         except Exception as e:
             logger.exception("Error en edición '%s': %s", variant_name, e)
     return results
