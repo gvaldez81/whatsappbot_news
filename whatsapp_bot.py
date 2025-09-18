@@ -4,11 +4,12 @@ import re
 import json
 import logging
 from typing import Any, Dict, Optional, Tuple
-
 import requests
 from flask import Flask, request, jsonify
 
 from config_loader import load_config
+from dotenv import load_dotenv
+load_dotenv()  # take environment variables from .env.
 
 # Opcional: adapta estos imports a tus funciones reales en generate_image.py
 # Debes implementar estas funciones en tu motor gráfico según tu diseño.
@@ -28,7 +29,7 @@ except Exception:
 # ------------------------------------------------------------------------------
 # Configuración básica
 # ------------------------------------------------------------------------------
-
+#print("Verify_token= "+os.getenv("WHATSAPP_VERIFY_TOKEN"))
 config = load_config()
 WA = config.get("whatsapp", {})
 SERVER = config.get("server", {})
