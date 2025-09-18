@@ -56,3 +56,6 @@ dist/
 
 # --- Otros ---
 *.sqlite3
+
+#Imagenes prueba
+*.jpg
