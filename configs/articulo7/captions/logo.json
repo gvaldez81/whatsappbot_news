@@ -1,0 +1,15 @@
+{
+  "default_category": "MEDIA",
+  "caption": "logo",
+  "logo": {
+    "enabled": true,
+    "path": "assets/overlays/logo.png",
+    "position": "bottom-right",
+    "scale": 0.2,
+    "margin": 20
+  },
+  "output": {
+    "format": "PNG",
+    "filename_logo": "logo.png"
+  }
+}

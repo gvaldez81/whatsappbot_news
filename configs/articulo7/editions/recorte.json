@@ -1,0 +1,21 @@
+{
+  "mode": "recorte",
+  "text": {
+    "title_size": 56,
+    "category_size": 36,
+    "title_color": [255, 255, 255],
+    "category_color": [255, 200, 0],
+    "margin_x": 50,
+    "margin_y": 50,
+    "line_spacing": 8,
+    "max_width_ratio": 0.8,
+    "gap_title_category": 10
+  },
+  "assets": {
+    "fonts_dir": "assets/fonts"
+  },
+  "output": {
+    "format": "JPEG",
+    "filename_link": "recorte.jpg"
+  }
+}

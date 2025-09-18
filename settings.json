@@ -1,0 +1,31 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "debug": false
+  },
+
+  "whatsapp": {
+    "api_url": "https://graph.facebook.com/v22.0",
+    "phone_number_id": "YOUR_PHONE_NUMBER_ID",
+    "verify_token": "YOUR_VERIFY_TOKEN",
+    "access_token": "YOUR_ACCESS_TOKEN"
+  },
+
+  "database": {
+    "engine": "tinydb",
+    "path": "messages.json"
+  },
+
+  "assets": {
+    "fonts_dir": "assets/fonts",
+    "overlays_dir": "assets/overlays",
+    "default_logo": "assets/overlays/logo.png",
+    "default_watermark": "assets/overlays/watermark.png"
+  },
+
+  "logging": {
+    "level": "INFO",
+    "file": "bot.log"
+  }
+}

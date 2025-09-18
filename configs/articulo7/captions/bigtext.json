@@ -1,0 +1,17 @@
+{
+  "default_category": "MEDIA",
+  "caption": "big",
+  "bigtext": {
+    "font": "assets/fonts/Impact.ttf",
+    "size": 96,
+    "color": [255, 255, 255],
+    "stroke_color": [0, 0, 0],
+    "stroke_width": 3,
+    "align": "center"
+  },
+  "output": {
+    "format": "JPEG",
+    "filename_bigtext": "bigtext.jpg"
+  }
+}
+

@@ -1,0 +1,58 @@
+# --- Archivos de sistema (macOS / Linux / Windows) ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Icon?
+Desktop.ini
+
+# --- Archivos temporales ---
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+
+# --- Logs ---
+*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+.env/
+.venv/
+ENV/
+env/
+env.bak/
+
+# Archivos de configuración locales
+*.env
+*.ini
+*.cfg
+
+# Compilados / builds
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Jupyter ---
+.ipynb_checkpoints
+
+# --- VSCode ---
+.vscode/
+.history/
+
+# --- PyCharm / JetBrains ---
+.idea/
+*.iml
+
+# --- Otros ---
+*.sqlite3

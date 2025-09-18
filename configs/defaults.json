@@ -1,0 +1,48 @@
+{
+  "assets": {
+    "fonts_dir": "assets/fonts",
+    "overlays_dir": "assets/overlays"
+  },
+  "text": {
+    "title_font": "assets/fonts/Montserrat-Light.ttf",
+    "title_size": 56,
+    "title_color": [255, 255, 255],
+    "category_font": "assets/fonts/Montserrat-Light.ttf",
+    "category_size": 36,
+    "category_color": [255, 200, 0],
+    "margin_x": 50,
+    "margin_y": 50,
+    "line_spacing": 8,
+    "max_width_ratio": 0.8,
+    "gap_title_category": 10,
+    "free_text_font": "assets/fonts/Impact.ttf",
+    "free_text_size": 64,
+    "free_text_color": [255, 255, 255],
+    "free_text_margin_x": 50,
+    "free_text_margin_y": 50,
+    "free_text_max_width_ratio": 0.85,
+    "free_text_line_spacing": 10
+  },
+  "logo": {
+    "path": "assets/overlays/logo.png",
+    "position": "bottom-right",
+    "scale": 0.2,
+    "margin": 20
+  },
+  "watermark": {
+    "path": "assets/overlays/watermark.png",
+    "position": "center",
+    "opacity": 0.3
+  },
+  "bigtext": {
+    "font": "assets/fonts/Impact.ttf",
+    "size": 96,
+    "color": [255, 255, 255],
+    "stroke_color": [0, 0, 0],
+    "stroke_width": 3,
+    "align": "center"
+  },
+  "output": {
+    "format": "JPEG"
+  }
+}
