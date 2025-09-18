@@ -1,6 +1,12 @@
 # processors/articulo7.py
 import requests
+import urllib3
 from bs4 import BeautifulSoup
+
+
+# Suppress only the InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def apply(url, config):
     """
@@ -12,7 +18,14 @@ def apply(url, config):
       - default_category: etiqueta fija (ej. "ARTÍCULO 7")
     """
     try:
-        resp = requests.get(url, timeout=10)
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        }
+        resp = requests.get(url, headers=headers, timeout=10, verify=False)
         resp.raise_for_status()
     except Exception as e:
         return {

@@ -45,7 +45,8 @@ def _save_to_bytes(img: Image.Image, format_hint: str = "JPEG") -> bytes:
 
 def _load_image_from_url(url: str) -> Image.Image:
     import requests
-    r = requests.get(url, timeout=15)
+    logger.warning("Deshabilitando verificación SSL para %s", url)
+    r = requests.get(url, timeout=15, verify=False)
     r.raise_for_status()
     img = Image.open(io.BytesIO(r.content))
     img = ImageOps.exif_transpose(img)
