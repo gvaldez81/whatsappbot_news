@@ -1,56 +1,51 @@
-# processors/watermark.py
 from PIL import Image, ImageEnhance
-from . import ensure_rgba, ensure_rgb, open_image
 
-def _apply_opacity(img: Image.Image, opacity: float) -> Image.Image:
-    """
-    Ajusta la opacidad de una imagen RGBA.
-    """
-    if img.mode != "RGBA":
-        img = img.convert("RGBA")
-    alpha = img.split()[3]
-    alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
-    img.putalpha(alpha)
-    return img
+def apply(base_img, cfg):
+    watermark_path = cfg.get("watermark_file", "watermark.png")
+    opacity = float(cfg.get("watermark_opacity", 0.3))
+    tile = bool(cfg.get("watermark_tile", True))
+    scale_ratio = float(cfg.get("watermark_scale_ratio", 0.25))
+    position = cfg.get("watermark_position", "center")  # Supports: center, top-left, top-right, bottom-left, bottom-right
+    margin = int(cfg.get("watermark_margin", 16))
 
-def apply(img, config):
-    """
-    Superpone una marca de agua sobre la imagen base.
+    watermark_img = Image.open(watermark_path).convert("RGBA")
+    # Scale watermark relative to base image width
+    wm_width = int(base_img.width * scale_ratio)
+    scale = wm_width / watermark_img.width
+    wm_height = int(watermark_img.height * scale)
+    watermark_img = watermark_img.resize((wm_width, wm_height), Image.ANTIALIAS)
 
-    Config soportada:
-      - watermark_file: ruta del PNG de la marca de agua (default: assets/overlays/watermark.png)
-      - watermark_opacity: opacidad global (0.0–1.0, default: 0.3)
-      - watermark_tile: si True, repite en mosaico; si False, centra
-      - watermark_scale_ratio: factor relativo al ancho de la imagen base (default: 0.25)
-    """
-    wm_path = config.get("watermark_file", "assets/overlays/watermark.png")
-    opacity = float(config.get("watermark_opacity", 0.3))
-    tile = bool(config.get("watermark_tile", False))
-    scale_ratio = float(config.get("watermark_scale_ratio", 0.25))
+    # Apply opacity
+    if opacity < 1:
+        alpha = watermark_img.split()[3]
+        alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
+        watermark_img.putalpha(alpha)
 
-    base = ensure_rgba(img)
-    wm = open_image(wm_path).convert("RGBA")
-
-    # Escalado relativo al ancho de la imagen base
-    bw, bh = base.size
-    target_w = max(1, int(bw * scale_ratio))
-    target_h = int(wm.height * (target_w / wm.width))
-    wm = wm.resize((target_w, target_h), Image.LANCZOS)
-
-    # Aplicar opacidad
-    wm = _apply_opacity(wm, opacity)
-
-    out = base.copy()
-
+    result = base_img.convert("RGBA")
     if tile:
-        # Repetir en mosaico
-        for y in range(0, bh, wm.height + 50):
-            for x in range(0, bw, wm.width + 50):
-                out.alpha_composite(wm, (x, y))
+        # Tiled pattern fill
+        for y in range(0, base_img.height, wm_height):
+            for x in range(0, base_img.width, wm_width):
+                result.alpha_composite(watermark_img, dest=(x, y))
     else:
-        # Centrado
-        x = (bw - wm.width) // 2
-        y = (bh - wm.height) // 2
-        out.alpha_composite(wm, (x, y))
-
-    return ensure_rgb(out)
+        # Single watermark: support center and corners
+        if position == "center":
+            x = (base_img.width - wm_width) // 2
+            y = (base_img.height - wm_height) // 2
+        elif position == "top-left":
+            x, y = margin, margin
+        elif position == "top-right":
+            x = base_img.width - wm_width - margin
+            y = margin
+        elif position == "bottom-left":
+            x = margin
+            y = base_img.height - wm_height - margin
+        elif position == "bottom-right":
+            x = base_img.width - wm_width - margin
+            y = base_img.height - wm_height - margin
+        else:
+            # Default to center
+            x = (base_img.width - wm_width) // 2
+            y = (base_img.height - wm_height) // 2
+        result.alpha_composite(watermark_img, dest=(int(x), int(y)))
+    return result.convert(base_img.mode)
