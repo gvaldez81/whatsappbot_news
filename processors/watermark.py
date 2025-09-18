@@ -1,8 +1,8 @@
 from PIL import Image, ImageEnhance
 
 def apply(base_img, cfg):
-    watermark_path = cfg.get("watermark_file", "watermark.png")
-    opacity = float(cfg.get("watermark_opacity", 0.3))
+    watermark_path = cfg.get("watermark_file", "assets/overlays/watermark.png")
+    opacity = float(cfg.get("watermark_opacity", 0.12))
     tile = bool(cfg.get("watermark_tile", True))
     scale_ratio = float(cfg.get("watermark_scale_ratio", 0.25))
     position = cfg.get("watermark_position", "center")  # Supports: center, top-left, top-right, bottom-left, bottom-right
@@ -13,7 +13,7 @@ def apply(base_img, cfg):
     wm_width = int(base_img.width * scale_ratio)
     scale = wm_width / watermark_img.width
     wm_height = int(watermark_img.height * scale)
-    watermark_img = watermark_img.resize((wm_width, wm_height), Image.ANTIALIAS)
+    watermark_img = watermark_img.resize((wm_width, wm_height), Image.Resampling.LANCZOS)
 
     # Apply opacity
     if opacity < 1:

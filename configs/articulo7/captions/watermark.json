@@ -3,9 +3,12 @@
   "caption": "watermark",
   "watermark": {
     "enabled": true,
-    "path": "assets/overlays/watermark.png",
-    "position": "center",
-    "opacity": 0.12
+    "watermark_file": "assets/overlays/watermark.png",
+    "watermark_opacity": 0.12,
+    "watermark_tile":true,
+    "watermark_scale_ratio":0.25,
+    "watermark_position": "center",
+    "watermark_margin":16
   },
   "output": {
     "format": "PNG",
