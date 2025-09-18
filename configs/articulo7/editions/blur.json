@@ -7,15 +7,25 @@
   "text": {
     "title_size": 72,
     "title_font": "assets/fonts/Impact.ttf",
+    "title_color": [255, 255, 255],
+    "title_x": 50,
+    "title_y": 700,
+    "max_width_ratio": 0.8,
+    
     "category_size": 40,
     "category_font": "assets/fonts/Montserrat-Light.ttf",
-    "title_color": [255, 255, 255],
     "category_color": [255, 200, 0],
+    "category_x": 50,
+    "category_y": 620,
+    "category_padding": 30,
+    "category_border_color": "#FF6000",
+    "border_thickness": 4,
+
     "margin_x": 50,
-    "margin_y": 700,
-    "line_spacing": 12,
-    "max_width_ratio": 0.9,
-    "gap_title_category": 20
+    "margin_y": 50,
+    
+    "line_spacing": 8,
+    "gap_title_category": 10
   },
   "assets": {
     "fonts_dir": "assets/fonts"
