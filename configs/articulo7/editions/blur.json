@@ -6,7 +6,9 @@
   },
   "text": {
     "title_size": 72,
+    "title_font": "assets/fonts/Impact.ttf",
     "category_size": 40,
+    "category_font": "assets/fonts/Montserrat-Light.ttf",
     "title_color": [255, 255, 255],
     "category_color": [255, 200, 0],
     "margin_x": 50,
