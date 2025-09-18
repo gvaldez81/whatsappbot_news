@@ -261,8 +261,13 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
 
     raw_caption = (caption or "").strip()
     kind, extra = captions.classify(raw_caption)
-    if raw_caption.lower().startswith("big"):
-        kind = "bigtext"
+    if raw_caption.lower().startswith("bigtext"):
+        parts = raw_caption.split(maxsplit=1)
+        extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
+    elif raw_caption.lower().startswith("blur"):
+        parts = raw_caption.split(maxsplit=1)
+        extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
+    elif raw_caption.lower().startswith("recorte"):
         parts = raw_caption.split(maxsplit=1)
         extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
 
@@ -294,8 +299,9 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
             raise RuntimeError(f"No existe una edición con mode='{kind}' en {editions_dir}")
 
         # Para media usamos el caption como título si hay texto, o placeholder
-        title = (extra.get("text") or raw_caption or "Sin título").strip()
-        category = "EDICIÓN"
+        #title = (extra.get("text") or raw_caption or "Sin título").strip()
+        title = ""
+        category = chosen.get("default_category", "ARTÍCULO 7")
         img = _apply_edition(base, title, category, chosen)
         fname = f"{kind}-{_unique_suffix()}.jpg"
         return _save_to_bytes(img, chosen.get("output", {}).get("format", "JPEG")), fname

@@ -1,5 +1,6 @@
 {
   "mode": "recorte",
+  "default_category": "ARTÍCULO 7",
   "text": {
     "title_size": 72,
     "category_size": 40,

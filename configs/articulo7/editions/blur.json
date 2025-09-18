@@ -1,5 +1,6 @@
 {
   "mode": "blur",
+  "default_category": "ARTÍCULO 7",
   "blur": {
     "radius": 25
   },

@@ -35,10 +35,10 @@
     "free_text_line_spacing": 10
   },
   "logo": {
-    "path": "assets/overlays/logo.png",
-    "position": "bottom-right",
-    "scale": 0.2,
-    "margin": 20
+    "logo_file": "assets/overlays/logo.png",
+    "logo_position": "bottom-right",
+    "logo_scale_ratio": 0.2,
+    "logo_margin": 20
   },
   "watermark": {
     "path": "assets/overlays/watermark.png",
