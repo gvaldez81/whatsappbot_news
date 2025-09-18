@@ -29,7 +29,7 @@ def apply(img, config):
     Config soportada:
       - logo_file: ruta del PNG del logo (default: assets/overlays/logo.png)
       - logo_position: top-left | top-right | bottom-left | bottom-right | center
-      - logo_scale_ratio: factor relativo al ancho de la imagen base (default: 0.2)
+      - logo_scale_ratio: factor relativo a la altura de la imagen base (default: 0.2)
       - logo_margin: margen en px desde el borde (default: 20)
     """
     logo_path = config.get("logo_file", "assets/overlays/logo.png")
@@ -40,10 +40,10 @@ def apply(img, config):
     base = ensure_rgba(img)
     overlay = open_image(logo_path).convert("RGBA")
 
-    # Escalado relativo al ancho de la imagen base
+    # Escalado relativo a la ALTURA de la imagen base
     bw, bh = base.size
-    target_w = max(1, int(bw * scale_ratio))
-    target_h = int(overlay.height * (target_w / overlay.width))
+    target_h = max(1, int(bh * scale_ratio))
+    target_w = int(overlay.width * (target_h / overlay.height))
     overlay = overlay.resize((target_w, target_h), Image.LANCZOS)
 
     # Posición calculada
