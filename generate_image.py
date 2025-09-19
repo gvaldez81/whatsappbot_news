@@ -307,7 +307,7 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
             raise RuntimeError(f"No existe una edición con mode='{kind}' en {editions_dir}")
 
         # Para media usamos el caption como título si hay texto, o placeholder
-        #title = (extra.get("text") or raw_caption or "Sin título").strip()
+        print((extra.get("text") or raw_caption or "Sin título").strip())
         title = ""
         category = chosen.get("default_category", "ARTÍCULO 7")
         img = _apply_edition(base, title, category, chosen)

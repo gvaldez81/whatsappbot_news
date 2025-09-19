@@ -130,7 +130,7 @@ def wa_download_media(media_url: str) -> Optional[bytes]:
 # Parsing del webhook
 # ------------------------------------------------------------------------------
 
-URL_RE = re.compile(r"https?://[^"]+")
+URL_RE = re.compile(r"https?://[^\s]+")
 
 def extract_message_entry(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
