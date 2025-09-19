@@ -1,11 +1,22 @@
-# Procesadores de imágenes
+# Procesadores de imágenes y videos
 
-Este directorio contiene los módulos **plug‑and‑play** que transforman imágenes o extraen metadatos según el tipo de entrada.  
+Este directorio contiene los módulos **plug‑and‑play** que transforman imágenes y videos o extraen metadatos según el tipo de entrada.  
 Todos comparten utilidades comunes definidas en `__init__.py` (`ensure_rgba`, `ensure_rgb`, `open_image`, `clamp`).
 
 ---
 
 ## 📌 Lista de procesadores
+
+### 0. `universal.py` ⭐ **NUEVO**
+- **Rol:** Procesador universal para imágenes y videos con soporte completo de efectos.
+- **Características:**
+  - Detección automática del tipo de media (imagen vs video)
+  - Soporte completo para logo, watermark, bigtext y otros efectos
+  - Usa PIL para efectos de imagen
+  - Usa ffmpeg-python para composición de video
+- **Entrada:** `process_media(media_bytes, caption, config)`
+- **Salida:** `(media_procesada_bytes, filename_sugerido)`
+- **Activación:** Usado automáticamente por WhatsApp bot y CLI
 
 ### 1. `captions.py`
 - **Rol:** Dispatcher central para captions de imágenes.
@@ -63,13 +74,17 @@ Todos comparten utilidades comunes definidas en `__init__.py` (`ensure_rgba`, `e
 
 ## 🔄 Flujo típico
 
-1. El bot recibe un mensaje (link o imagen con caption).
-2. `generate_image.py` determina el `source_type` y carga el config (merge de `defaults.json` + override).
-3. Si es imagen con caption → `captions.process_caption` decide:
-   - Procesador especial (`watermark`, `logo`, `big_text`).
-   - O texto libre → se dibuja como título.
-4. Si es link de Sitio de Noticias → `newsname.apply` devuelve metadatos para renderizar.
-5. El motor aplica filtros, tipografía y guarda la imagen final.
+1. El bot recibe un mensaje (link, imagen o video con caption).
+2. `generate_image.py` y el bot de WhatsApp usan el procesador universal (`universal.py`) para:
+   - Detectar automáticamente si el media es imagen o video
+   - Aplicar efectos apropiados según el caption
+3. Para imágenes: se aplican efectos directamente usando PIL
+4. Para videos: se crean overlays con PIL y se componen con ffmpeg-python
+5. Efectos soportados para ambos tipos de media:
+   - `"logo"` → overlay de logo
+   - `"watermark"` → marca de agua (solo imágenes por ahora)
+   - `"big TEXTO"` → texto grande
+   - Texto libre → se renderiza como bigtext
 
 ---
 
