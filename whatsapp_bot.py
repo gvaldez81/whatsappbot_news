@@ -15,7 +15,7 @@ load_dotenv()  # take environment variables from .env.
 # Debes implementar estas funciones en tu motor gráfico según tu diseño.
 # - generate_from_link(url, config) -> (bytes, filename)   # retorna bytes de imagen y nombre sugerido
 # - generate_from_media(image_bytes, caption, config) -> (bytes, filename)
-# - generate_all_from_link(url, config) -> List[Tuple[bytes, filename]]
+# - generate_all_from_link(url, config, effect=None) -> List[Tuple[bytes, filename]]
 try:
     from generate_image import generate_from_link, generate_from_media, generate_all_from_link
 except Exception:
@@ -26,9 +26,8 @@ except Exception:
     def generate_from_media(image_bytes: bytes, caption: Optional[str], config: Dict[str, Any]) -> Tuple[bytes, str]:
         raise NotImplementedError("Implementa generate_from_media(image_bytes, caption, config) en generate_image.py")
 
-    def generate_all_from_link(url: str, config: Dict[str, Any]) -> List[Tuple[bytes, str]]:
-        raise NotImplementedError("Implementa generate_all_from_link(url, config) en generate_image.py")
-
+    def generate_all_from_link(url: str, config: Dict[str, Any], effect: Optional[str] = None) -> List[Tuple[bytes, str]]:
+        raise NotImplementedError("Implementa generate_all_from_link(url, config, effect) en generate_image.py")
 
 # ------------------------------------------------------------------------------
 # Configuración básica
@@ -47,12 +46,10 @@ LOG_LEVEL = (config.get("logging", {}) or {}).get("level", "INFO").upper()
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("whatsapp_bot")
 
-
 # ------------------------------------------------------------------------------
 # App
 # ------------------------------------------------------------------------------
 app = Flask(__name__)
-
 
 # ------------------------------------------------------------------------------
 # Utilidades WhatsApp Cloud API
@@ -69,7 +66,6 @@ def wa_send_text(to: str, body: str) -> None:
     r = requests.post(url, headers=headers, json=payload, timeout=15)
     if r.status_code >= 300:
         logger.error("Error al enviar texto: %s %s", r.status_code, r.text)
-
 
 def wa_upload_media(image_bytes: bytes, filename: str = "image.jpg", mime: str = "image/jpeg") -> Optional[str]:
     """
@@ -91,7 +87,6 @@ def wa_upload_media(image_bytes: bytes, filename: str = "image.jpg", mime: str =
     media_id = r.json().get("id")
     return media_id
 
-
 def wa_send_image_by_media_id(to: str, media_id: str, caption: Optional[str] = None) -> None:
     url = f"{GRAPH_BASE}/{PHONE_NUMBER_ID}/messages"
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
@@ -108,7 +103,6 @@ def wa_send_image_by_media_id(to: str, media_id: str, caption: Optional[str] = N
     if r.status_code >= 300:
         logger.error("Error al enviar imagen: %s %s", r.status_code, r.text)
 
-
 def wa_get_media_url(media_id: str) -> Optional[str]:
     """
     Obtiene la URL temporal de descarga para un media_id.
@@ -121,7 +115,6 @@ def wa_get_media_url(media_id: str) -> Optional[str]:
         return None
     return r.json().get("url")
 
-
 def wa_download_media(media_url: str) -> Optional[bytes]:
     """
     Descarga el binario de la imagen desde la URL temporal.
@@ -133,12 +126,11 @@ def wa_download_media(media_url: str) -> Optional[bytes]:
         return None
     return r.content
 
-
 # ------------------------------------------------------------------------------
 # Parsing del webhook
 # ------------------------------------------------------------------------------
 
-URL_RE = re.compile(r"https?://[^\s]+")
+URL_RE = re.compile(r"https?://[^"]+")
 
 def extract_message_entry(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
@@ -160,11 +152,10 @@ def extract_message_entry(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         logger.warning("No se pudo extraer mensaje: %s", e)
         return None
 
-
 def classify_message(msg: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     """
     Clasifica el mensaje:
-      - ('text_link', {'url': ...})
+      - ('text_link', {'url': ..., 'effect': ...})
       - ('image', {'media_id': ..., 'caption': ...})
       - ('text', {'body': ...})
     """
@@ -173,7 +164,10 @@ def classify_message(msg: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         body = (msg.get("text") or {}).get("body", "").strip()
         url_match = URL_RE.search(body)
         if url_match:
-            return "text_link", {"url": url_match.group(0), "full_text": body}
+            parts = body.split()
+            url = parts[0]
+            effect = parts[1] if len(parts) > 1 else None
+            return "text_link", {"url": url, "effect": effect, "full_text": body}
         return "text", {"body": body}
 
     if msg_type == "image":
@@ -185,20 +179,17 @@ def classify_message(msg: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     # Otros tipos (audio, video, docs, interactive, etc.)
     return "unsupported", {"raw": msg}
 
-
 # ------------------------------------------------------------------------------
 # Handlers de negocio
 # ------------------------------------------------------------------------------
-def handle_text_link(to: str, url: str) -> None:
+def handle_text_link(to: str, url: str, effect: Optional[str] = None) -> None:
     try:
         wa_send_text(to, "Procesando tu enlace…")
-        # Nueva lógica: generar todas las imágenes (por cada edición)
-        all_images = generate_all_from_link(url, config)  # Debes tener esta función implementada
-        if not all_images:
-            wa_send_text(to, "No se generaron imágenes para el enlace.")
+        all_images_or_msg = generate_all_from_link(url, config, effect=effect)
+        if isinstance(all_images_or_msg, str):
+            wa_send_text(to, all_images_or_msg)
             return
-
-        for image_info in all_images:
+        for image_info in all_images_or_msg:
             image_bytes = image_info["bytes"]
             filename = image_info.get("filename", "image.jpg")
             media_id = wa_upload_media(image_bytes, filename=filename)
@@ -212,7 +203,6 @@ def handle_text_link(to: str, url: str) -> None:
     except Exception as e:
         logger.exception("Error procesando link: %s", e)
         wa_send_text(to, f"Hubo un error procesando el enlace. {e}")
-
 
 def handle_image(to: str, media_id: str, caption: Optional[str]) -> None:
     try:
@@ -238,7 +228,6 @@ def handle_image(to: str, media_id: str, caption: Optional[str]) -> None:
     except Exception as e:
         logger.exception("Error procesando imagen: %s", e)
         wa_send_text(to, f"Hubo un error procesando tu imagen. {e}")
-
 
 # ------------------------------------------------------------------------------
 # Webhook endpoints
@@ -276,7 +265,7 @@ def inbound():
     logger.info("Mensaje clasificado: %s", kind)
 
     if kind == "text_link":
-        handle_text_link(to, data["url"])
+        handle_text_link(to, data["url"], data.get("effect"))
     elif kind == "image":
         handle_image(to, data["media_id"], data.get("caption"))
     elif kind == "text":
@@ -289,7 +278,6 @@ def inbound():
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
-
 
 # ------------------------------------------------------------------------------
 # Main
