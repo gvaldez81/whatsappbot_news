@@ -1,4 +1,21 @@
 # whatsapp_bot.py
+"""
+WhatsApp Bot for Image and Video Processing
+
+This bot supports receiving and processing both images and videos with various effects:
+- Logo overlay
+- Watermark (images only)
+- Big text overlay
+- Custom text rendering
+
+Supported media types:
+- Images: JPEG, PNG, etc.
+- Videos: MP4, MOV, AVI, MKV, etc.
+
+All processing is handled by the universal processor (processors/universal.py) which
+automatically detects media type and applies appropriate effects using PIL for images
+and ffmpeg-python for video composition.
+"""
 import os
 import re
 import json

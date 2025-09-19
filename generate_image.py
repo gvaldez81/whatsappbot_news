@@ -1,3 +1,21 @@
+"""
+Universal Media Processing CLI
+
+This CLI tool supports processing both images and videos with various effects:
+- Logo overlay
+- Watermark
+- Big text overlay  
+- Custom text rendering
+- Editions and filters
+
+Usage:
+  python generate_image.py --image photo.jpg --caption "logo"
+  python generate_image.py --video clip.mp4 --caption "big Hello World!"
+  python generate_image.py --link https://example.com/news
+
+The tool automatically detects media type (image vs video) and applies effects
+using the universal processor (processors/universal.py).
+"""
 import io
 import os
 import json

@@ -30,19 +30,29 @@ def is_video_file(file_bytes: bytes) -> bool:
         b'\x00\x00\x00\x18ftypmp4',    # MP4
         b'\x00\x00\x00\x20ftypmp4',    # MP4
         b'\x00\x00\x00\x1cftypisom',   # MP4/ISOM
-        b'RIFF',                        # AVI (starts with RIFF, then has 'AVI ' later)
+        b'\x00\x00\x00\x20ftypisom',   # MP4/ISOM (our test video)
         b'\x00\x00\x00\x14ftypqt',     # MOV
         b'\x1aE\xdf\xa3',              # MKV
         b'FLV',                         # FLV
         b'\x00\x00\x01\xb3',           # MPEG
         b'\x00\x00\x01\xba',           # MPEG
+        b'RIFF',                        # AVI (starts with RIFF, then has 'AVI ' later)
     ]
     
     file_start = file_bytes[:32]
     
+    # First check for exact matches
     for signature in video_signatures:
         if file_start.startswith(signature):
             return True
+    
+    # More flexible MP4/MOV detection - check for ftyp box anywhere within first 16 bytes
+    if b'ftyp' in file_start[:16]:
+        # Check if it contains common MP4/MOV type indicators
+        ftyp_indicators = [b'mp4', b'isom', b'M4V', b'mp41', b'mp42', b'avc1', b'qt']
+        for indicator in ftyp_indicators:
+            if indicator in file_start:
+                return True
     
     # Check for AVI (RIFF + AVI combination)
     if file_start.startswith(b'RIFF') and b'AVI ' in file_bytes[:64]:
