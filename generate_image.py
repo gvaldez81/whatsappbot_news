@@ -227,7 +227,8 @@ def generate_all_from_link(url: str, base_settings: Dict[str, Any],
     if effect:
         filtered = [e for e in editions if (e.get("mode") or "").lower() == effect.lower()]
         if not filtered:
-            return [f"No hay configuración para el efecto solicitado: {effect}"]
+            #return [f"No hay configuración para el efecto solicitado: {effect}"]
+            raise RuntimeError(f"No hay configuración para el efecto solicitado: {effect}")
         editions = filtered
 
     results: List[Dict[str, Any]] = []
