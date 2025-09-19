@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
 from processors import articulo7, captions, logo, watermark, big_text
 from processors import text_render, filters, crop
+from processors.universal import process_media
 
 logger = logging.getLogger("generate_image")
 
@@ -262,125 +263,21 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
       - Texto libre  -> si classify lo identifica como 'text'
     """
     logger.info("Procesando media con caption: %s", caption)
-
-    base = Image.open(io.BytesIO(image_bytes))
-    base = ImageOps.exif_transpose(base)
-    if base.mode not in ("RGB", "RGBA"):
-        base = base.convert("RGB")
-
-    raw_caption = (caption or "").strip()
-    kind, extra = captions.classify(raw_caption)
-    if raw_caption.lower().startswith("bigtext"):
-        parts = raw_caption.split(maxsplit=1)
-        extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
-    elif raw_caption.lower().startswith("blur"):
-        parts = raw_caption.split(maxsplit=1)
-        extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
-    elif raw_caption.lower().startswith("recorte"):
-        parts = raw_caption.split(maxsplit=1)
-        extra = {"text": parts[1].strip()} if len(parts) > 1 else {"text": ""}
-
-    if kind == "logo":
-        img = logo.apply(base, base_settings.get("logo", {}))
-        fname = f"logo-{_unique_suffix()}.jpg"
-        return _save_to_bytes(img, base_settings.get("output", {}).get("format", "JPEG")), fname
-
-    if kind == "watermark":
-        img = watermark.apply(base, base_settings.get("watermark", {}))
-        fname = f"watermark-{_unique_suffix()}.jpg"
-        return _save_to_bytes(img, base_settings.get("output", {}).get("format", "JPEG")), fname
-
-    if kind == "bigtext":
-        text = (extra.get("text") or "").strip()
-        img = big_text.apply(base, text, base_settings.get("bigtext", {}))
-        fname = f"bigtext-{_unique_suffix()}.jpg"
-        return _save_to_bytes(img, base_settings.get("output", {}).get("format", "JPEG")), fname
-
-    if kind in ("recorte", "blur"):
-        editions_dir = "configs/articulo7/editions"
-        editions = _load_variant_confs_from_dir(base_settings, editions_dir)
-        chosen = None
-        for ed in editions:
-            if (ed.get("mode") or "").lower() == kind:
-                chosen = ed
-                break
-        if not chosen:
-            raise RuntimeError(f"No existe una edición con mode='{kind}' en {editions_dir}")
-
-        # Para media usamos el segundo parametro si se entrego (solo para editions)
-        # en caso contrario el titulo es vacio
-        print("raw_caption")
-        print(raw_caption)
-        title = (extra.get("text") or "").strip()
-        category = chosen.get("default_category", "")
-        img = _apply_edition(base, title, category, chosen)
-        fname = f"{kind}-{_unique_suffix()}.jpg"
-        return _save_to_bytes(img, chosen.get("output", {}).get("format", "JPEG")), fname
-
-    if kind == "text":
-        text = (extra.get("text") or "").strip()
-        fonts_dir = base_settings.get("assets", {}).get("fonts_dir", "assets/fonts")
-        text_cfg = base_settings.get("text", {})
-        font_path = text_cfg.get("free_text_font", f"{fonts_dir}/Impact.ttf")
-        size = int(text_cfg.get("free_text_size", 64))
-        color = tuple(text_cfg.get("free_text_color", [255, 255, 255]))
-        margin_x = int(text_cfg.get("free_text_margin_x", 50))
-        margin_y = int(text_cfg.get("free_text_margin_y", 50))
-        max_width_ratio = float(text_cfg.get("free_text_max_width_ratio", 0.85))
-        line_spacing = int(text_cfg.get("free_text_line_spacing", 10))
-
-        font = _safe_truetype(font_path, size)
-        draw = ImageDraw.Draw(base)
-        max_w = int(base.width * max_width_ratio)
-
-        # Wrap básico (puedes cambiar a text_render si quieres tracking/sombra)
-        def _text_size(draw, text, font):
-            if hasattr(draw, "textbbox"):
-                bbox = draw.textbbox((0, 0), text, font=font)
-                return bbox[2] - bbox[0], bbox[3] - bbox[1]
-            return draw.textsize(text, font=font)
-
-        def _wrap_text(text, font, max_width, draw):
-            words = text.split()
-            if not words:
-                return ""
-            lines, current = [], words[0]
-            for w in words[1:]:
-                test = f"{current} {w}"
-                w_px, _ = _text_size(draw, test, font)
-                if w_px <= max_w:
-                    current = test
-                else:
-                    lines.append(current)
-                    current = w
-            lines.append(current)
-            return "\n".join(lines)
-
-        wrapped = _wrap_text(text, font, max_w, draw)
-        y = margin_y
-        for line in wrapped.split("\n"):
-            draw.text((margin_x, y), line, font=font, fill=color)
-            _, h = _text_size(draw, line, font)
-            y += h + line_spacing
-
-        fname = f"text-{_unique_suffix()}.jpg"
-        return _save_to_bytes(base, base_settings.get("output", {}).get("format", "JPEG")), fname
-
-    # Fallback
-    fname = f"original-{_unique_suffix()}.jpg"
-    return image_bytes, fname
+    
+    # Use the universal processor for all media processing
+    return process_media(image_bytes, caption, base_settings)
 
 # ------------------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------------------
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Motor gráfico (links generan todas las ediciones; media por caption)."
+        description="Motor gráfico (links generan todas las ediciones; media por caption). Soporta imágenes y videos."
     )
     parser.add_argument("--link", help="Procesar un enlace (genera todas las ediciones en configs/articulo7/editions)")
     parser.add_argument("--image", help="Ruta a una imagen local")
-    parser.add_argument("--caption", help="Caption para la imagen (logo, watermark, big [TEXTO], recorte, blur)")
+    parser.add_argument("--video", help="Ruta a un video local")
+    parser.add_argument("--caption", help="Caption para la imagen/video (logo, watermark, big [TEXTO], recorte, blur)")
     parser.add_argument("--output", help="Archivo o prefijo de salida", default="output.jpg")
     parser.add_argument("--editions-dir", help="Directorio de ediciones para links/captions", default="configs/articulo7/editions")
     parser.add_argument("--defaults", help="Ruta a defaults.json", default="configs/defaults.json")
@@ -407,15 +304,36 @@ def main():
 
     if args.image:
         with open(args.image, "rb") as f:
-            img_b = f.read()
-        out_bytes, name = generate_from_media(img_b, args.caption, cfg)
-        out_path = args.output
+            media_bytes = f.read()
+        out_bytes, name = process_media(media_bytes, args.caption, cfg)
+        
+        # Set appropriate output extension based on detected media type
+        if name.endswith('.mp4'):
+            base, _ = os.path.splitext(args.output)
+            out_path = base + '.mp4'
+        else:
+            out_path = args.output
+            
         with open(out_path, "wb") as f:
             f.write(out_bytes)
-        print(f"Generada: {out_path} (sugerido: {name})")
+        print(f"Procesada imagen: {out_path} (sugerido: {name})")
         return
 
-    parser.error("Debes especificar --link o --image")
+    if args.video:
+        with open(args.video, "rb") as f:
+            media_bytes = f.read()
+        out_bytes, name = process_media(media_bytes, args.caption, cfg)
+        
+        # Set appropriate output extension for video
+        base, _ = os.path.splitext(args.output)
+        out_path = base + '.mp4'
+            
+        with open(out_path, "wb") as f:
+            f.write(out_bytes)
+        print(f"Procesado video: {out_path} (sugerido: {name})")
+        return
+
+    parser.error("Debes especificar --link, --image o --video")
 
 
 if __name__ == "__main__":

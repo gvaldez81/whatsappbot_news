@@ -11,6 +11,13 @@ from config_loader import load_config
 from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env.
 
+# Import universal processor for both images and videos
+try:
+    from processors.universal import process_media
+except ImportError:
+    def process_media(media_bytes: bytes, caption: Optional[str], config: Dict[str, Any]) -> Tuple[bytes, str]:
+        raise NotImplementedError("Universal processor not available")
+
 # Opcional: adapta estos imports a tus funciones reales en generate_image.py
 # Debes implementar estas funciones en tu motor gráfico según tu diseño.
 # - generate_from_link(url, config) -> (bytes, filename)   # retorna bytes de imagen y nombre sugerido
@@ -67,20 +74,24 @@ def wa_send_text(to: str, body: str) -> None:
     if r.status_code >= 300:
         logger.error("Error al enviar texto: %s %s", r.status_code, r.text)
 
-def wa_upload_media(image_bytes: bytes, filename: str = "image.jpg", mime: str = "image/jpeg") -> Optional[str]:
+def wa_upload_media(media_bytes: bytes, filename: str = "media.jpg", mime: str = "image/jpeg") -> Optional[str]:
     """
-    Sube un archivo binario (imagen) a la API y devuelve media_id.
+    Sube un archivo binario (imagen o video) a la API y devuelve media_id.
     """
     url = f"{GRAPH_BASE}/{PHONE_NUMBER_ID}/media"
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     files = {
-        "file": (filename, image_bytes, mime)
+        "file": (filename, media_bytes, mime)
     }
+    
+    # Determine media type based on MIME type
+    media_type = "video" if mime.startswith("video/") else "image"
+    
     data = {
         "messaging_product": "whatsapp",
-        "type": "image"
+        "type": media_type
     }
-    r = requests.post(url, headers=headers, files=files, data=data, timeout=30)
+    r = requests.post(url, headers=headers, files=files, data=data, timeout=60)  # Increased timeout for videos
     if r.status_code >= 300:
         logger.error("Error al subir media: %s %s", r.status_code, r.text)
         return None
@@ -102,6 +113,22 @@ def wa_send_image_by_media_id(to: str, media_id: str, caption: Optional[str] = N
     r = requests.post(url, headers=headers, json=payload, timeout=15)
     if r.status_code >= 300:
         logger.error("Error al enviar imagen: %s %s", r.status_code, r.text)
+
+def wa_send_video_by_media_id(to: str, media_id: str, caption: Optional[str] = None) -> None:
+    url = f"{GRAPH_BASE}/{PHONE_NUMBER_ID}/messages"
+    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
+    video_obj: Dict[str, Any] = {"id": media_id}
+    if caption:
+        video_obj["caption"] = caption
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "video",
+        "video": video_obj
+    }
+    r = requests.post(url, headers=headers, json=payload, timeout=15)
+    if r.status_code >= 300:
+        logger.error("Error al enviar video: %s %s", r.status_code, r.text)
 
 def wa_get_media_url(media_id: str) -> Optional[str]:
     """
@@ -176,7 +203,13 @@ def classify_message(msg: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         caption = image.get("caption")
         return "image", {"media_id": media_id, "caption": caption}
 
-    # Otros tipos (audio, video, docs, interactive, etc.)
+    if msg_type == "video":
+        video = msg.get("video") or {}
+        media_id = video.get("id")
+        caption = video.get("caption")
+        return "video", {"media_id": media_id, "caption": caption}
+
+    # Otros tipos (audio, docs, interactive, etc.)
     return "unsupported", {"raw": msg}
 
 # ------------------------------------------------------------------------------
@@ -216,7 +249,8 @@ def handle_image(to: str, media_id: str, caption: Optional[str]) -> None:
             wa_send_text(to, "No pude descargar la imagen. Inténtalo de nuevo.")
             return
 
-        image_bytes, filename = generate_from_media(img_bytes, caption, config)
+        # Use universal processor for image processing
+        image_bytes, filename = process_media(img_bytes, caption, config)
         upload_id = wa_upload_media(image_bytes, filename=filename)
         if not upload_id:
             wa_send_text(to, "No pude subir la imagen generada. Inténtalo de nuevo más tarde.")
@@ -228,6 +262,32 @@ def handle_image(to: str, media_id: str, caption: Optional[str]) -> None:
     except Exception as e:
         logger.exception("Error procesando imagen: %s", e)
         wa_send_text(to, f"Hubo un error procesando tu imagen. {e}")
+
+def handle_video(to: str, media_id: str, caption: Optional[str]) -> None:
+    try:
+        wa_send_text(to, "Procesando tu video…")
+        media_url = wa_get_media_url(media_id)
+        if not media_url:
+            wa_send_text(to, "No pude obtener el archivo de video. Inténtalo de nuevo.")
+            return
+        video_bytes = wa_download_media(media_url)
+        if not video_bytes:
+            wa_send_text(to, "No pude descargar el video. Inténtalo de nuevo.")
+            return
+
+        # Use universal processor for video processing
+        processed_bytes, filename = process_media(video_bytes, caption, config)
+        upload_id = wa_upload_media(processed_bytes, filename=filename, mime="video/mp4")
+        if not upload_id:
+            wa_send_text(to, "No pude subir el video procesado. Inténtalo de nuevo más tarde.")
+            return
+        wa_send_video_by_media_id(to, upload_id)
+    except NotImplementedError as e:
+        logger.error("Función no implementada: %s", e)
+        wa_send_text(to, "Esta función aún no está disponible en el bot.")
+    except Exception as e:
+        logger.exception("Error procesando video: %s", e)
+        wa_send_text(to, f"Hubo un error procesando tu video. {e}")
 
 # ------------------------------------------------------------------------------
 # Webhook endpoints
@@ -268,8 +328,10 @@ def inbound():
         handle_text_link(to, data["url"], data.get("effect"))
     elif kind == "image":
         handle_image(to, data["media_id"], data.get("caption"))
+    elif kind == "video":
+        handle_video(to, data["media_id"], data.get("caption"))
     elif kind == "text":
-        wa_send_text(to, "Envíame un enlace o una imagen con caption (logo, watermark, !big ...).")
+        wa_send_text(to, "Envíame un enlace, una imagen o un video con caption (logo, watermark, big [TEXTO], etc.).")
     else:
         wa_send_text(to, "Tipo de mensaje no soportado por ahora.")
 
