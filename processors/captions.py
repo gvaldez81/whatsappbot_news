@@ -20,9 +20,9 @@ def classify(caption: str):
         # lo manejamos también aquí por compatibilidad
         parts = caption.split(maxsplit=1)
         return "bigtext", {"text": parts[1].strip() if len(parts) > 1 else ""}
-    if cap == "recorte":
+    if cap.startswith("recorte"):
         return "recorte", {}
-    if cap == "blur":
+    if cap.startswith("blur"):
         return "blur", {}
 
     # Si no coincide con comandos conocidos, lo tratamos como texto libre

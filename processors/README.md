@@ -51,13 +51,13 @@ Todos comparten utilidades comunes definidas en `__init__.py` (`ensure_rgba`, `e
 
 ---
 
-### 5. `article7.py`
-- **Rol:** Extrae metadatos de un link de Artículo 7.
+### 5. `newsname.py`
+- **Rol:** Extrae metadatos de un link del sitio de noticias.
 - **Acciones:**
   - Descarga HTML.
   - Obtiene `og:image`, `og:title`, sección/categoría.
   - Respeta `use_static_category` y `default_category` en config.
-- **Activación:** cuando el `source_type` es `"articulo7"`.
+- **Activación:** cuando el `source_type` es `"newsname"`.
 
 ---
 
@@ -68,7 +68,7 @@ Todos comparten utilidades comunes definidas en `__init__.py` (`ensure_rgba`, `e
 3. Si es imagen con caption → `captions.process_caption` decide:
    - Procesador especial (`watermark`, `logo`, `big_text`).
    - O texto libre → se dibuja como título.
-4. Si es link de Artículo 7 → `article7.apply` devuelve metadatos para renderizar.
+4. Si es link de Sitio de Noticias → `newsname.apply` devuelve metadatos para renderizar.
 5. El motor aplica filtros, tipografía y guarda la imagen final.
 
 ---

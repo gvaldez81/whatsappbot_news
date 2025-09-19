@@ -209,7 +209,7 @@ def generate_all_from_link(url: str, base_settings: Dict[str, Any],
         raise RuntimeError(meta["error"])
 
     title = meta.get("title") or "Sin título"
-    category = meta.get("category") or "ARTÍCULO 7"
+    category = meta.get("category")
     image_url = meta.get("image_url")
     if not image_url:
         raise RuntimeError("No se encontró imagen en el enlace.")
@@ -306,10 +306,12 @@ def generate_from_media(image_bytes: bytes, caption: Optional[str], base_setting
         if not chosen:
             raise RuntimeError(f"No existe una edición con mode='{kind}' en {editions_dir}")
 
-        # Para media usamos el caption como título si hay texto, o placeholder
-        print((extra.get("text") or raw_caption or "Sin título").strip())
-        title = ""
-        category = chosen.get("default_category", "ARTÍCULO 7")
+        # Para media usamos el segundo parametro si se entrego (solo para editions)
+        # en caso contrario el titulo es vacio
+        print("raw_caption")
+        print(raw_caption)
+        title = (extra.get("text") or "").strip()
+        category = chosen.get("default_category", "")
         img = _apply_edition(base, title, category, chosen)
         fname = f"{kind}-{_unique_suffix()}.jpg"
         return _save_to_bytes(img, chosen.get("output", {}).get("format", "JPEG")), fname
